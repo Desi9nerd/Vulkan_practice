@@ -68,6 +68,7 @@ VkRenderer::VkRenderer() {
     // vkCreateInstance로 인스턴스 생성. 생성된 인스턴스가 mInstance에 쓰여진다.
     VK_CHECK_ERROR(vkCreateInstance(&instanceCreateInfo, nullptr, &mInstance));
 
+
     // ================================================================================
     // 2. VkPhysicalDevice 선택
     // ================================================================================
@@ -99,8 +100,55 @@ VkRenderer::VkRenderer() {
     aout << setw(16) << left << " - Driver Version: "
          << VK_API_VERSION_MAJOR(physicalDeviceProperties.driverVersion) << "."
          << VK_API_VERSION_MINOR(physicalDeviceProperties.driverVersion);
+
+
+    // ================================================================================
+    // 3. VkDevice 생성
+    // ================================================================================
+    uint32_t queueFamilyPropertiesCount;
+
+    //---------------------------------------------------------------------------------
+    //** queueFamily 속성을 조회
+    // 사용 가능한 queueFamily의 수(=queueFamilyPropertiesCount)를 얻어온다.
+    vkGetPhysicalDeviceQueueFamilyProperties(mPhysicalDevice, &queueFamilyPropertiesCount, nullptr);
+
+    vector<VkQueueFamilyProperties> queueFamilyProperties(queueFamilyPropertiesCount);
+    // 해당 queueFamily들의 속성을 배열에 얻어온다.
+    vkGetPhysicalDeviceQueueFamilyProperties(mPhysicalDevice, &queueFamilyPropertiesCount, queueFamilyProperties.data());
+    //---------------------------------------------------------------------------------
+
+    // 특정 queueFamilyProperties가 VK_QUEUE_GRAPHICS_BIT를 지원하는지 확인.
+    // 지원하는 queueFamilyProperties를 찾으면 break. queueFamily에 대한 정보는 mQueueFamilyIndex에 저장.
+    for (mQueueFamilyIndex = 0;
+         mQueueFamilyIndex != queueFamilyPropertiesCount; ++mQueueFamilyIndex) {
+        if (queueFamilyProperties[mQueueFamilyIndex].queueFlags & VK_QUEUE_GRAPHICS_BIT) {
+            break;
+        }
+    }
+
+    // 생성할 큐를 정의
+    const vector<float> queuePriorities{1.0};
+    VkDeviceQueueCreateInfo deviceQueueCreateInfo{
+            .sType = VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO,
+            .queueFamilyIndex = mQueueFamilyIndex,      // queueFamilyIndex
+            .queueCount = 1,                            // 생성할 큐의 개수
+            .pQueuePriorities = queuePriorities.data()  // 큐의 우선순위
+    };
+
+    // 생성할 Device 정의
+    VkDeviceCreateInfo deviceCreateInfo{
+            .sType = VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO,
+            .queueCreateInfoCount = 1,                  // 큐의 개수
+            .pQueueCreateInfos = &deviceQueueCreateInfo // 생성할 큐의 정보
+    };
+
+    // vkCreateDevice를 호출하여 Device 생성(= mDevice 생성)
+    VK_CHECK_ERROR(vkCreateDevice(mPhysicalDevice, &deviceCreateInfo, nullptr, &mDevice));
+    // 생성된 Device(= mDevice)로부터 큐를 vkGetDeviceQueue를 호출하여 얻어온다.
+    vkGetDeviceQueue(mDevice, mQueueFamilyIndex, 0, &mQueue);
 }
 
 VkRenderer::~VkRenderer() {
+    vkDestroyDevice(mDevice, nullptr); // Device 파괴. queue의 경우 Device를 생성하면서 생겼기 때문에 따로 파괴하는 API가 존재하지 않는다.
     vkDestroyInstance(mInstance, nullptr);
 }
