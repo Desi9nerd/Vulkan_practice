@@ -31,7 +31,9 @@
 using namespace std;
 
 VkRenderer::VkRenderer() {
-
+    // ================================================================================
+    // 1. VkInstance 생성
+    // ================================================================================
     // VkApplicationInfo 구조체 정의
     VkApplicationInfo applicationInfo{
         .sType = VK_STRUCTURE_TYPE_APPLICATION_INFO,
@@ -65,6 +67,38 @@ VkRenderer::VkRenderer() {
 
     // vkCreateInstance로 인스턴스 생성. 생성된 인스턴스가 mInstance에 쓰여진다.
     VK_CHECK_ERROR(vkCreateInstance(&instanceCreateInfo, nullptr, &mInstance));
+
+    // ================================================================================
+    // 2. VkPhysicalDevice 선택
+    // ================================================================================
+    uint32_t physicalDeviceCount;
+    VK_CHECK_ERROR(vkEnumeratePhysicalDevices(mInstance, &physicalDeviceCount, nullptr));
+
+    vector<VkPhysicalDevice> physicalDevices(physicalDeviceCount);
+    VK_CHECK_ERROR(vkEnumeratePhysicalDevices(
+            mInstance, &physicalDeviceCount, physicalDevices.data()));
+
+    // 간단한 예제를 위해 첫 번째 VkPhysicalDevice를 사용
+    mPhysicalDevice = physicalDevices[0];
+
+    VkPhysicalDeviceProperties physicalDeviceProperties; // 이 구조체 안에 GPU에 필요한 모든 정보가 있다.
+    vkGetPhysicalDeviceProperties(mPhysicalDevice, &physicalDeviceProperties);
+
+    aout << "Selected Physical Device Information ↓" << endl;
+    aout << setw(16) << left << " - Device Name: "
+         << string_view(physicalDeviceProperties.deviceName) << endl;
+    aout << setw(16) << left << " - Device Type: "
+         << vkToString(physicalDeviceProperties.deviceType) << endl;
+    aout << std::hex;
+    aout << setw(16) << left << " - Device ID: " << physicalDeviceProperties.deviceID << endl;
+    aout << setw(16) << left << " - Vendor ID: " << physicalDeviceProperties.vendorID << endl;
+    aout << std::dec;
+    aout << setw(16) << left << " - API Version: "
+         << VK_API_VERSION_MAJOR(physicalDeviceProperties.apiVersion) << "."
+         << VK_API_VERSION_MINOR(physicalDeviceProperties.apiVersion);
+    aout << setw(16) << left << " - Driver Version: "
+         << VK_API_VERSION_MAJOR(physicalDeviceProperties.driverVersion) << "."
+         << VK_API_VERSION_MINOR(physicalDeviceProperties.driverVersion);
 }
 
 VkRenderer::~VkRenderer() {
