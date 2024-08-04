@@ -56,13 +56,34 @@ VkRenderer::VkRenderer() {
         instanceLayerNames.push_back(layerProperty.layerName);
     }
 
+    uint32_t instanceExtensionCount; // 사용 가능한 InstanceExtension 개수
+    VK_CHECK_ERROR(vkEnumerateInstanceExtensionProperties(nullptr,
+                                                          &instanceExtensionCount,
+                                                          nullptr));
+
+    vector<VkExtensionProperties> instanceExtensionProperties(instanceExtensionCount);
+    VK_CHECK_ERROR(vkEnumerateInstanceExtensionProperties(nullptr,
+                                                          &instanceExtensionCount,
+                                                          instanceExtensionProperties.data()));
+
+    vector<const char *> instanceExtensionNames; // instanceExtensionName을 담는 배열
+    for (const auto &properties: instanceExtensionProperties) {
+        if (properties.extensionName == string("VK_KHR_surface") ||
+            properties.extensionName == string("VK_KHR_android_surface")) {
+            instanceExtensionNames.push_back(properties.extensionName);
+        }
+    }
+    assert(instanceExtensionNames.size() == 2); // 반드시 2개의 이름이 필요하기 때문에 확인
+
     // sType: 구조체의 타입, pApplicationInfo: 어플리케이션의 이름
     // enabledLayerCount, ppEnableLayerNames: 사용할 레이어의 정보를 정의
     VkInstanceCreateInfo instanceCreateInfo{
         .sType = VK_STRUCTURE_TYPE_INSTANCE_CREATE_INFO,
         .pApplicationInfo = &applicationInfo,
         .enabledLayerCount = static_cast<uint32_t>(instanceLayerNames.size()),
-        .ppEnabledLayerNames = instanceLayerNames.data()
+        .ppEnabledLayerNames = instanceLayerNames.data(),
+        .enabledExtensionCount = static_cast<uint32_t>(instanceExtensionNames.size()),
+        .ppEnabledExtensionNames = instanceExtensionNames.data()
     };
 
     // vkCreateInstance로 인스턴스 생성. 생성된 인스턴스가 mInstance에 쓰여진다.
@@ -135,11 +156,33 @@ VkRenderer::VkRenderer() {
             .pQueuePriorities = queuePriorities.data()  // 큐의 우선순위
     };
 
+    uint32_t deviceExtensionCount; // 사용 가능한 deviceExtension 개수
+    VK_CHECK_ERROR(vkEnumerateDeviceExtensionProperties(mPhysicalDevice,
+                                                        nullptr,
+                                                        &deviceExtensionCount,
+                                                        nullptr));
+
+    vector<VkExtensionProperties> deviceExtensionProperties(deviceExtensionCount);
+    VK_CHECK_ERROR(vkEnumerateDeviceExtensionProperties(mPhysicalDevice,
+                                                        nullptr,
+                                                        &deviceExtensionCount,
+                                                        deviceExtensionProperties.data()));
+
+    vector<const char *> deviceExtensionNames;
+    for (const auto &properties: deviceExtensionProperties) {
+        if (properties.extensionName == string("VK_KHR_swapchain")) {
+            deviceExtensionNames.push_back(properties.extensionName);
+        }
+    }
+    assert(deviceExtensionNames.size() == 1); // VK_KHR_swapchain이 반드시 필요하기 때문에 확인
+
     // 생성할 Device 정의
     VkDeviceCreateInfo deviceCreateInfo{
             .sType = VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO,
-            .queueCreateInfoCount = 1,                  // 큐의 개수
-            .pQueueCreateInfos = &deviceQueueCreateInfo // 생성할 큐의 정보
+            .queueCreateInfoCount = 1,                   // 큐의 개수
+            .pQueueCreateInfos = &deviceQueueCreateInfo, // 생성할 큐의 정보
+            .enabledExtensionCount = static_cast<uint32_t>(deviceExtensionNames.size()),
+            .ppEnabledExtensionNames = deviceExtensionNames.data() // 활성화하려는 deviceExtension들을 넘겨줌
     };
 
     // vkCreateDevice를 호출하여 Device 생성(= mDevice 생성)
