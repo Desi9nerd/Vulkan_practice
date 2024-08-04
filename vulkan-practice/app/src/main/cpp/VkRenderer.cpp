@@ -97,8 +97,7 @@ VkRenderer::VkRenderer() {
     VK_CHECK_ERROR(vkEnumeratePhysicalDevices(mInstance, &physicalDeviceCount, nullptr));
 
     vector<VkPhysicalDevice> physicalDevices(physicalDeviceCount);
-    VK_CHECK_ERROR(vkEnumeratePhysicalDevices(
-            mInstance, &physicalDeviceCount, physicalDevices.data()));
+    VK_CHECK_ERROR(vkEnumeratePhysicalDevices(mInstance, &physicalDeviceCount, physicalDevices.data()));
 
     // 간단한 예제를 위해 첫 번째 VkPhysicalDevice를 사용
     mPhysicalDevice = physicalDevices[0];
@@ -189,9 +188,29 @@ VkRenderer::VkRenderer() {
     VK_CHECK_ERROR(vkCreateDevice(mPhysicalDevice, &deviceCreateInfo, nullptr, &mDevice));
     // 생성된 Device(= mDevice)로부터 큐를 vkGetDeviceQueue를 호출하여 얻어온다.
     vkGetDeviceQueue(mDevice, mQueueFamilyIndex, 0, &mQueue);
+
+
+    // ================================================================================
+    // 4. VkSurface 생성
+    // ================================================================================
+    VkAndroidSurfaceCreateInfoKHR surfaceCreateInfo{
+            .sType = VK_STRUCTURE_TYPE_ANDROID_SURFACE_CREATE_INFO_KHR,
+            .window = window
+    };
+
+    // surface 생성.
+    VK_CHECK_ERROR(vkCreateAndroidSurfaceKHR(mInstance, &surfaceCreateInfo, nullptr, &mSurface));
+
+    VkBool32 supported; // surface 지원 여부
+    VK_CHECK_ERROR(vkGetPhysicalDeviceSurfaceSupportKHR(mPhysicalDevice,
+                                                        mQueueFamilyIndex,
+                                                        mSurface,
+                                                        &supported)); // 지원 여부를 받아옴.
+    assert(supported);
 }
 
 VkRenderer::~VkRenderer() {
+    vkDestroySurfaceKHR(mInstance, mSurface, nullptr);
     vkDestroyDevice(mDevice, nullptr); // Device 파괴. queue의 경우 Device를 생성하면서 생겼기 때문에 따로 파괴하는 API가 존재하지 않는다.
     vkDestroyInstance(mInstance, nullptr);
 }
