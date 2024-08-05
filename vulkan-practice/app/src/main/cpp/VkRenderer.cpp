@@ -207,9 +207,99 @@ VkRenderer::VkRenderer() {
                                                         mSurface,
                                                         &supported)); // 지원 여부를 받아옴.
     assert(supported);
+
+
+    // ================================================================================
+    // 5. VkSwapchain 생성
+    // ================================================================================
+    VkSurfaceCapabilitiesKHR surfaceCapabilities;
+    VK_CHECK_ERROR(vkGetPhysicalDeviceSurfaceCapabilitiesKHR(mPhysicalDevice,
+                                                             mSurface,
+                                                             &surfaceCapabilities));
+
+    VkCompositeAlphaFlagBitsKHR compositeAlpha = VK_COMPOSITE_ALPHA_FLAG_BITS_MAX_ENUM_KHR;
+    for (auto i = 0; i <= 4; ++i) {
+        if (auto flag = 0x1u << i; surfaceCapabilities.supportedCompositeAlpha & flag) {
+            compositeAlpha = static_cast<VkCompositeAlphaFlagBitsKHR>(flag);
+            break;
+        }
+    }
+    assert(compositeAlpha != VK_COMPOSITE_ALPHA_FLAG_BITS_MAX_ENUM_KHR);
+
+    VkImageUsageFlags imageUsage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT;
+    assert(surfaceCapabilities.supportedUsageFlags & imageUsage);
+
+    uint32_t surfaceFormatCount = 0;
+    VK_CHECK_ERROR(vkGetPhysicalDeviceSurfaceFormatsKHR(mPhysicalDevice,
+                                                        mSurface,
+                                                        &surfaceFormatCount,
+                                                        nullptr));
+
+    vector<VkSurfaceFormatKHR> surfaceFormats(surfaceFormatCount);
+    VK_CHECK_ERROR(vkGetPhysicalDeviceSurfaceFormatsKHR(mPhysicalDevice,
+                                                        mSurface,
+                                                        &surfaceFormatCount,
+                                                        surfaceFormats.data()));
+
+    uint32_t surfaceFormatIndex = VK_FORMAT_MAX_ENUM;
+    for (auto i = 0; i != surfaceFormatCount; ++i) {
+        if (surfaceFormats[i].format == VK_FORMAT_R8G8B8A8_UNORM) {
+            surfaceFormatIndex = i;
+            break;
+        }
+    }
+    assert(surfaceFormatIndex != VK_FORMAT_MAX_ENUM);
+
+    uint32_t presentModeCount;
+    VK_CHECK_ERROR(vkGetPhysicalDeviceSurfacePresentModesKHR(mPhysicalDevice,
+                                                             mSurface,
+                                                             &presentModeCount,
+                                                             nullptr));
+
+    vector<VkPresentModeKHR> presentModes(presentModeCount);
+    VK_CHECK_ERROR(vkGetPhysicalDeviceSurfacePresentModesKHR(mPhysicalDevice,
+                                                             mSurface,
+                                                             &presentModeCount,
+                                                             presentModes.data()));
+
+    uint32_t presentModeIndex = VK_PRESENT_MODE_MAX_ENUM_KHR;
+    for (auto i = 0; i != presentModeCount; ++i) {
+        if (presentModes[i] == VK_PRESENT_MODE_FIFO_KHR) {
+            presentModeIndex = i;
+            break;
+        }
+    }
+    assert(presentModeIndex != VK_PRESENT_MODE_MAX_ENUM_KHR);
+
+    VkSwapchainCreateInfoKHR swapchainCreateInfo{
+            .sType = VK_STRUCTURE_TYPE_SWAPCHAIN_CREATE_INFO_KHR,
+            .surface = mSurface,
+            .minImageCount = surfaceCapabilities.minImageCount,
+            .imageFormat = surfaceFormats[surfaceFormatIndex].format,
+            .imageColorSpace = surfaceFormats[surfaceFormatIndex].colorSpace,
+            .imageExtent = surfaceCapabilities.currentExtent,
+            .imageArrayLayers = 1,
+            .imageUsage = imageUsage,
+            .imageSharingMode = VK_SHARING_MODE_EXCLUSIVE,
+            .preTransform = surfaceCapabilities.currentTransform,
+            .compositeAlpha = compositeAlpha,
+            .presentMode = presentModes[presentModeIndex]
+    };
+
+    VK_CHECK_ERROR(vkCreateSwapchainKHR(mDevice, &swapchainCreateInfo, nullptr, &mSwapchain));
+
+    uint32_t swapchainImageCount;
+    VK_CHECK_ERROR(vkGetSwapchainImagesKHR(mDevice, mSwapchain, &swapchainImageCount, nullptr));
+
+    mSwapchainImages.resize(swapchainImageCount);
+    VK_CHECK_ERROR(vkGetSwapchainImagesKHR(mDevice,
+                                           mSwapchain,
+                                           &swapchainImageCount,
+                                           mSwapchainImages.data()));
 }
 
 VkRenderer::~VkRenderer() {
+    vkDestroySwapchainKHR(mDevice, mSwapchain, nullptr);
     vkDestroySurfaceKHR(mInstance, mSurface, nullptr);
     vkDestroyDevice(mDevice, nullptr); // Device 파괴. queue의 경우 Device를 생성하면서 생겼기 때문에 따로 파괴하는 API가 존재하지 않는다.
     vkDestroyInstance(mInstance, nullptr);
