@@ -296,9 +296,21 @@ VkRenderer::VkRenderer() {
                                            mSwapchain,
                                            &swapchainImageCount,
                                            mSwapchainImages.data()));
+
+    // ================================================================================
+    // 6. VkCommandPool 생성
+    // ================================================================================
+    VkCommandPoolCreateInfo commandPoolCreateInfo{
+            .sType = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO,
+            .flags = VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT, // command buffer를 개별적으로 초기화 가능하게 설정
+            .queueFamilyIndex = mQueueFamilyIndex
+    };
+
+    VK_CHECK_ERROR(vkCreateCommandPool(mDevice, &commandPoolCreateInfo, nullptr, &mCommandPool)); // mCommandPool 생성
 }
 
 VkRenderer::~VkRenderer() {
+    vkDestroyCommandPool(mDevice, mCommandPool, nullptr);
     vkDestroySwapchainKHR(mDevice, mSwapchain, nullptr);
     vkDestroySurfaceKHR(mInstance, mSurface, nullptr);
     vkDestroyDevice(mDevice, nullptr); // Device 파괴. queue의 경우 Device를 생성하면서 생겼기 때문에 따로 파괴하는 API가 존재하지 않는다.
