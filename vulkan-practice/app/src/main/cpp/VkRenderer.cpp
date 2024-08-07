@@ -321,9 +321,59 @@ VkRenderer::VkRenderer() {
     VK_CHECK_ERROR(vkAllocateCommandBuffers(mDevice, &commandBufferAllocateInfo, &mCommandBuffer));
 
     // ================================================================================
-    // 6. VkCommandBuffer 재설정
+    // 7. VkCommandBuffer 기록 시작
     // ================================================================================
-    VK_CHECK_ERROR(vkResetCommandBuffer(mCommandBuffer, 0));
+    VkCommandBufferBeginInfo commandBufferBeginInfo{
+            .sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO,
+            .flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT // 한 번만 기록되고 다시 리셋 될 것이라는 의미
+    };
+
+    // mCommandBuffer를 기록중인 상태로 변경.
+    VK_CHECK_ERROR(vkBeginCommandBuffer(mCommandBuffer, &commandBufferBeginInfo));
+
+    for (auto swapchainImage : mSwapchainImages) { // 스왑체인 이미지만큼 for문을 돈다.
+        // ================================================================================
+        // 8. VkImage 색상 초기화
+        // ================================================================================
+        VkClearColorValue clearColorValue{
+                .float32 = {0.6431, 0.7765, 0.2235, 1.0} // 초록색으로 clearColor 지정.
+        };
+
+        VkImageSubresourceRange imageSubresourceRange { // clear할 영역 지정.
+                .aspectMask = VK_IMAGE_ASPECT_COLOR_BIT,
+                .baseMipLevel = 0,
+                .levelCount = 1,
+                .baseArrayLayer = 0,
+                .layerCount = 1
+        };
+
+        // 해당 swapchainImage를 초록색으로 clear해준다.
+        vkCmdClearColorImage(mCommandBuffer,
+                             swapchainImage,
+                             VK_IMAGE_LAYOUT_UNDEFINED,
+                             &clearColorValue,
+                             1,
+                             &imageSubresourceRange);
+    }
+
+    // ================================================================================
+    // 9. VkCommandBuffer 기록 종료
+    // ================================================================================
+    VK_CHECK_ERROR(vkEndCommandBuffer(mCommandBuffer)); // mCommandBuffer는 Executable 상태가 된다.
+
+    // ================================================================================
+    // 10. VkCommandBuffer 제출
+    // ================================================================================
+    VkSubmitInfo submitInfo{
+            .sType = VK_STRUCTURE_TYPE_SUBMIT_INFO,
+            .commandBufferCount = 1,
+            .pCommandBuffers = &mCommandBuffer
+    };
+
+    // submitInfo 구조체를 넘김으로써 commandBuffer 정보를 queue에 제출
+    VK_CHECK_ERROR(vkQueueSubmit(mQueue, 1, &submitInfo, VK_NULL_HANDLE));
+    // commandBuffer를 vkQueueSubmit에 제출했지만 해당 Command buffer가 실행이 됐을지 안 됐을지 알 수 없다. CPU와 GPU는 따로따로 돌기 때문에 항상 실행이 됐다는 보장을 할 수 없다. 그래서 이를 보장하기 위해 vkQueueWaitIdle를 호출하여 이 queue에 제출한 Command buffer가 모두 다 실행되는 것을 보장한다.
+    VK_CHECK_ERROR(vkQueueWaitIdle(mQueue));
 }
 
 VkRenderer::~VkRenderer() {
@@ -333,4 +383,30 @@ VkRenderer::~VkRenderer() {
     vkDestroySurfaceKHR(mInstance, mSurface, nullptr);
     vkDestroyDevice(mDevice, nullptr); // Device 파괴. queue의 경우 Device를 생성하면서 생겼기 때문에 따로 파괴하는 API가 존재하지 않는다.
     vkDestroyInstance(mInstance, nullptr);
+}
+
+void VkRenderer::render() {
+    // ================================================================================
+    // 1. 화면에 출력할 수 있는 VkImage 얻기
+    // ================================================================================
+    uint32_t swapchainImageIndex;
+    VK_CHECK_ERROR(vkAcquireNextImageKHR(mDevice,
+                                         mSwapchain,
+                                         UINT64_MAX,
+                                         VK_NULL_HANDLE,
+                                         VK_NULL_HANDLE,
+                                         &swapchainImageIndex)); // 사용 가능한 이미지 변수에 담기
+
+    // ================================================================================
+    // 2. VkImage 화면에 출력
+    // ================================================================================
+    VkPresentInfoKHR presentInfo{
+            .sType = VK_STRUCTURE_TYPE_PRESENT_INFO_KHR,
+            .swapchainCount = 1,
+            .pSwapchains = &mSwapchain,
+            .pImageIndices = &swapchainImageIndex
+    };
+
+    VK_CHECK_ERROR(vkQueuePresentKHR(mQueue, &presentInfo)); // 화면에 출력.
+    VK_CHECK_ERROR(vkQueueWaitIdle(mQueue));
 }
