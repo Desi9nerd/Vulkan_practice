@@ -374,9 +374,20 @@ VkRenderer::VkRenderer() {
     VK_CHECK_ERROR(vkQueueSubmit(mQueue, 1, &submitInfo, VK_NULL_HANDLE));
     // commandBuffer를 vkQueueSubmit에 제출했지만 해당 Command buffer가 실행이 됐을지 안 됐을지 알 수 없다. CPU와 GPU는 따로따로 돌기 때문에 항상 실행이 됐다는 보장을 할 수 없다. 그래서 이를 보장하기 위해 vkQueueWaitIdle를 호출하여 이 queue에 제출한 Command buffer가 모두 다 실행되는 것을 보장한다.
     VK_CHECK_ERROR(vkQueueWaitIdle(mQueue));
+
+
+    // ================================================================================
+    // 11. VkFence 생성
+    // ================================================================================
+    VkFenceCreateInfo fenceCreateInfo{
+        .sType = VK_STRUCTURE_TYPE_FENCE_CREATE_INFO
+    }; // 생성할 Fence의 정보를 해당 구조체에서 정의
+
+    VK_CHECK_ERROR(vkCreateFence(mDevice, &fenceCreateInfo, nullptr, &mFence)); // mFence 생성. flag에 아무것도 넣어주지 않았기 때문에 생성된 Fence의 초기 상태는 Unsignal 상태다.
 }
 
 VkRenderer::~VkRenderer() {
+    vkDestroyFence(mDevice, mFence, nullptr);
     vkFreeCommandBuffers(mDevice, mCommandPool, 1, &mCommandBuffer);
     vkDestroyCommandPool(mDevice, mCommandPool, nullptr);
     vkDestroySwapchainKHR(mDevice, mSwapchain, nullptr);
@@ -394,11 +405,22 @@ void VkRenderer::render() {
                                          mSwapchain,
                                          UINT64_MAX,
                                          VK_NULL_HANDLE,
-                                         VK_NULL_HANDLE,
+                                         mFence,                 // Fence 설정
                                          &swapchainImageIndex)); // 사용 가능한 이미지 변수에 담기
 
+
     // ================================================================================
-    // 2. VkImage 화면에 출력
+    // 2. VkFence 기다린 후 초기화
+    // ================================================================================
+    // mFence가 Signal 될 때까지 기다린다.
+    VK_CHECK_ERROR(vkWaitForFences(mDevice, 1, &mFence, VK_TRUE, UINT64_MAX));
+    // mFence가 Siganl이 되면 vkResetFences를 호출해서 Fence의 상태를 다시 초기화한다.
+    // 초기화하는 이유: vkAcquireNextImageKHR을 호출할 때 이 Fence의 상태는 항상 Unsignal 상태여야 하기 때문이다.
+    VK_CHECK_ERROR(vkResetFences(mDevice, 1, &mFence));
+
+
+    // ================================================================================
+    // 3. VkImage 화면에 출력
     // ================================================================================
     VkPresentInfoKHR presentInfo{
             .sType = VK_STRUCTURE_TYPE_PRESENT_INFO_KHR,
