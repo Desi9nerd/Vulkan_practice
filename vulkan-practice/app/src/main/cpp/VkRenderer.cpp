@@ -23,6 +23,7 @@
 #include <cassert>
 #include <array>
 #include <vector>
+#include <iomanip>
 
 #include "VkRenderer.h"
 #include "VkUtil.h"
@@ -30,7 +31,7 @@
 
 using namespace std;
 
-VkRenderer::VkRenderer() {
+VkRenderer::VkRenderer(ANativeWindow *window) {
     // ================================================================================
     // 1. VkInstance 생성
     // ================================================================================
@@ -226,7 +227,7 @@ VkRenderer::VkRenderer() {
     }
     assert(compositeAlpha != VK_COMPOSITE_ALPHA_FLAG_BITS_MAX_ENUM_KHR);
 
-    VkImageUsageFlags imageUsage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT;
+    VkImageUsageFlags imageUsage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT;
     assert(surfaceCapabilities.supportedUsageFlags & imageUsage);
 
     uint32_t surfaceFormatCount = 0;
