@@ -336,11 +336,43 @@ VkRenderer::VkRenderer(ANativeWindow *window) {
         // ================================================================================
         // 8. VkImage 색상 초기화
         // ================================================================================
-        VkClearColorValue clearColorValue{
-                .float32 = {0.6431, 0.7765, 0.2235, 1.0} // 초록색으로 clearColor 지정.
+        VkImageMemoryBarrier imageMemoryBarrierForClearColorImage{
+                .sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER,
+                .srcAccessMask = VK_ACCESS_NONE,
+                .dstAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT,
+                .oldLayout = VK_IMAGE_LAYOUT_UNDEFINED,
+                .newLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
+                .srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
+                .dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
+                .image = swapchainImage,
+                .subresourceRange = {
+                        .aspectMask = VK_IMAGE_ASPECT_COLOR_BIT,
+                        .baseMipLevel = 0,
+                        .levelCount = 1,
+                        .baseArrayLayer = 0,
+                        .layerCount = 1
+                }
         };
 
-        VkImageSubresourceRange imageSubresourceRange { // clear할 영역 지정.
+        vkCmdPipelineBarrier(mCommandBuffer,
+                             VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT,
+                             VK_PIPELINE_STAGE_TRANSFER_BIT,
+                             0,
+                             0,
+                             nullptr,
+                             0,
+                             nullptr,
+                             1,
+                             &imageMemoryBarrierForClearColorImage);
+
+        // ================================================================================
+        // 9. VkImage 색상 초기화
+        // ================================================================================
+        VkClearColorValue clearColorValue{
+                .float32 = {0.6431, 0.7765, 0.2235, 1.0}
+        };
+
+        VkImageSubresourceRange imageSubresourceRange{
                 .aspectMask = VK_IMAGE_ASPECT_COLOR_BIT,
                 .baseMipLevel = 0,
                 .levelCount = 1,
@@ -348,14 +380,46 @@ VkRenderer::VkRenderer(ANativeWindow *window) {
                 .layerCount = 1
         };
 
-        // 해당 swapchainImage를 초록색으로 clear해준다.
         vkCmdClearColorImage(mCommandBuffer,
                              swapchainImage,
-                             VK_IMAGE_LAYOUT_UNDEFINED,
+                             VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
                              &clearColorValue,
                              1,
                              &imageSubresourceRange);
+
+        // ================================================================================
+        // 10. VkImageLayout 변환
+        // ================================================================================
+        VkImageMemoryBarrier imageMemoryBarrierForPresentSwapchainImage{
+                .sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER,
+                .srcAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT,
+                .dstAccessMask = 0,
+                .oldLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
+                .newLayout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR,
+                .srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
+                .dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
+                .image = swapchainImage,
+                .subresourceRange = {
+                        .aspectMask = VK_IMAGE_ASPECT_COLOR_BIT,
+                        .baseMipLevel = 0,
+                        .levelCount = 1,
+                        .baseArrayLayer = 0,
+                        .layerCount = 1
+                }
+        };
+
+        vkCmdPipelineBarrier(mCommandBuffer,
+                             VK_PIPELINE_STAGE_TRANSFER_BIT,
+                             VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT,
+                             0,
+                             0,
+                             nullptr,
+                             0,
+                             nullptr,
+                             1,
+                             &imageMemoryBarrierForPresentSwapchainImage);
     }
+
 
     // ================================================================================
     // 9. VkCommandBuffer 기록 종료
