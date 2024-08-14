@@ -227,8 +227,8 @@ VkRenderer::VkRenderer(ANativeWindow *window) {
     }
     assert(compositeAlpha != VK_COMPOSITE_ALPHA_FLAG_BITS_MAX_ENUM_KHR);
 
-    VkImageUsageFlags imageUsage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT;
-    assert(surfaceCapabilities.supportedUsageFlags & imageUsage);
+    VkImageUsageFlags swapchainImageUsage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT;
+    assert(surfaceCapabilities.supportedUsageFlags & VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT);
 
     uint32_t surfaceFormatCount = 0;
     VK_CHECK_ERROR(vkGetPhysicalDeviceSurfaceFormatsKHR(mPhysicalDevice,
@@ -280,7 +280,7 @@ VkRenderer::VkRenderer(ANativeWindow *window) {
             .imageColorSpace = surfaceFormats[surfaceFormatIndex].colorSpace,
             .imageExtent = surfaceCapabilities.currentExtent,
             .imageArrayLayers = 1,
-            .imageUsage = imageUsage,
+            .imageUsage = swapchainImageUsage,
             .imageSharingMode = VK_SHARING_MODE_EXCLUSIVE,
             .preTransform = surfaceCapabilities.currentTransform,
             .compositeAlpha = compositeAlpha,
@@ -303,14 +303,15 @@ VkRenderer::VkRenderer(ANativeWindow *window) {
     // ================================================================================
     VkCommandPoolCreateInfo commandPoolCreateInfo{
             .sType = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO,
-            .flags = VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT, // command buffer를 개별적으로 초기화 가능하게 설정
+            .flags = VK_COMMAND_POOL_CREATE_TRANSIENT_BIT |           // command buffer가 자주 변경될 것임을 알려줌
+                     VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT, // command buffer를 개별적으로 초기화 가능하게 설정
             .queueFamilyIndex = mQueueFamilyIndex
     };
 
     VK_CHECK_ERROR(vkCreateCommandPool(mDevice, &commandPoolCreateInfo, nullptr, &mCommandPool)); // mCommandPool 생성
 
     // ================================================================================
-    // 6. VkCommandBuffer 할당
+    // 7. VkCommandBuffer 할당
     // ================================================================================
     VkCommandBufferAllocateInfo commandBufferAllocateInfo{ // 할당하려는 command buffer 정의
             .sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO,
@@ -322,7 +323,7 @@ VkRenderer::VkRenderer(ANativeWindow *window) {
     VK_CHECK_ERROR(vkAllocateCommandBuffers(mDevice, &commandBufferAllocateInfo, &mCommandBuffer));
 
     // ================================================================================
-    // 7. VkCommandBuffer 기록 시작
+    // 8. VkCommandBuffer 기록 시작
     // ================================================================================
     VkCommandBufferBeginInfo commandBufferBeginInfo{
             .sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO,
@@ -334,67 +335,13 @@ VkRenderer::VkRenderer(ANativeWindow *window) {
 
     for (auto swapchainImage : mSwapchainImages) { // 스왑체인 이미지만큼 for문을 돈다.
         // ================================================================================
-        // 8. VkImage 색상 초기화
-        // ================================================================================
-        VkImageMemoryBarrier imageMemoryBarrierForClearColorImage{
-                .sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER,
-                .srcAccessMask = VK_ACCESS_NONE,
-                .dstAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT,
-                .oldLayout = VK_IMAGE_LAYOUT_UNDEFINED,
-                .newLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
-                .srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
-                .dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
-                .image = swapchainImage,
-                .subresourceRange = {
-                        .aspectMask = VK_IMAGE_ASPECT_COLOR_BIT,
-                        .baseMipLevel = 0,
-                        .levelCount = 1,
-                        .baseArrayLayer = 0,
-                        .layerCount = 1
-                }
-        };
-
-        vkCmdPipelineBarrier(mCommandBuffer,
-                             VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT,
-                             VK_PIPELINE_STAGE_TRANSFER_BIT,
-                             0,
-                             0,
-                             nullptr,
-                             0,
-                             nullptr,
-                             1,
-                             &imageMemoryBarrierForClearColorImage);
-
-        // ================================================================================
-        // 9. VkImage 색상 초기화
-        // ================================================================================
-        VkClearColorValue clearColorValue{
-                .float32 = {0.6431, 0.7765, 0.2235, 1.0}
-        };
-
-        VkImageSubresourceRange imageSubresourceRange{
-                .aspectMask = VK_IMAGE_ASPECT_COLOR_BIT,
-                .baseMipLevel = 0,
-                .levelCount = 1,
-                .baseArrayLayer = 0,
-                .layerCount = 1
-        };
-
-        vkCmdClearColorImage(mCommandBuffer,
-                             swapchainImage,
-                             VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
-                             &clearColorValue,
-                             1,
-                             &imageSubresourceRange);
-
-        // ================================================================================
-        // 10. VkImageLayout 변환
+        // 9. VkImageLayout 변환
         // ================================================================================
         VkImageMemoryBarrier imageMemoryBarrierForPresentSwapchainImage{
                 .sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER,
-                .srcAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT,
+                .srcAccessMask = 0,
                 .dstAccessMask = 0,
-                .oldLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
+                .oldLayout = VK_IMAGE_LAYOUT_UNDEFINED,
                 .newLayout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR,
                 .srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
                 .dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
@@ -409,7 +356,7 @@ VkRenderer::VkRenderer(ANativeWindow *window) {
         };
 
         vkCmdPipelineBarrier(mCommandBuffer,
-                             VK_PIPELINE_STAGE_TRANSFER_BIT,
+                             VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT,
                              VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT,
                              0,
                              0,
@@ -420,14 +367,13 @@ VkRenderer::VkRenderer(ANativeWindow *window) {
                              &imageMemoryBarrierForPresentSwapchainImage);
     }
 
-
     // ================================================================================
-    // 9. VkCommandBuffer 기록 종료
+    // 10. VkCommandBuffer 기록 종료
     // ================================================================================
     VK_CHECK_ERROR(vkEndCommandBuffer(mCommandBuffer)); // mCommandBuffer는 Executable 상태가 된다.
 
     // ================================================================================
-    // 10. VkCommandBuffer 제출
+    // 11. VkCommandBuffer 제출
     // ================================================================================
     VkSubmitInfo submitInfo{
             .sType = VK_STRUCTURE_TYPE_SUBMIT_INFO,
@@ -442,7 +388,7 @@ VkRenderer::VkRenderer(ANativeWindow *window) {
 
 
     // ================================================================================
-    // 11. VkFence 생성
+    // 12. VkFence 생성
     // ================================================================================
     VkFenceCreateInfo fenceCreateInfo{
         .sType = VK_STRUCTURE_TYPE_FENCE_CREATE_INFO
@@ -472,7 +418,7 @@ void VkRenderer::render() {
                                          VK_NULL_HANDLE,
                                          mFence,                 // Fence 설정
                                          &swapchainImageIndex)); // 사용 가능한 이미지 변수에 담기
-
+    auto swapchainImage = mSwapchainImages[swapchainImageIndex];
 
     // ================================================================================
     // 2. VkFence 기다린 후 초기화
@@ -483,9 +429,135 @@ void VkRenderer::render() {
     // 초기화하는 이유: vkAcquireNextImageKHR을 호출할 때 이 Fence의 상태는 항상 Unsignal 상태여야 하기 때문이다.
     VK_CHECK_ERROR(vkResetFences(mDevice, 1, &mFence));
 
+    // ================================================================================
+    // 3. VkCommandBuffer 초기화
+    // ================================================================================
+    vkResetCommandBuffer(mCommandBuffer, 0);
 
     // ================================================================================
-    // 3. VkImage 화면에 출력
+    // 4. VkCommandBuffer 기록 시작
+    // ================================================================================
+    VkCommandBufferBeginInfo commandBufferBeginInfo{
+            .sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO,
+            .flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT // 한 번만 기록되고 다시 리셋 될 것이라는 의미
+    };
+
+    // mCommandBuffer를 기록중인 상태로 변경.
+    VK_CHECK_ERROR(vkBeginCommandBuffer(mCommandBuffer, &commandBufferBeginInfo));
+
+    // ================================================================================
+    // 5. VkImageLayout 변환
+    // ================================================================================
+    VkImageMemoryBarrier imageMemoryBarrierForClearColorImage{
+            .sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER,
+            .srcAccessMask = VK_ACCESS_NONE,
+            .dstAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT,
+            .oldLayout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR,
+            .newLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
+            .srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
+            .dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
+            .image = swapchainImage,
+            .subresourceRange = {
+                    .aspectMask = VK_IMAGE_ASPECT_COLOR_BIT,
+                    .baseMipLevel = 0,
+                    .levelCount = 1,
+                    .baseArrayLayer = 0,
+                    .layerCount = 1
+            }
+    };
+
+    vkCmdPipelineBarrier(mCommandBuffer,
+                         VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT,
+                         VK_PIPELINE_STAGE_TRANSFER_BIT,
+                         0,
+                         0,
+                         nullptr,
+                         0,
+                         nullptr,
+                         1,
+                         &imageMemoryBarrierForClearColorImage);
+
+    // ================================================================================
+    // 6. Clear 색상 갱신
+    // ================================================================================
+    for (auto i = 0; i != 4; ++i) {
+        mClearColorValue.float32[i] = fmodf(mClearColorValue.float32[i] + 0.01, 1.0);
+    }
+
+    // ================================================================================
+    // 7. VkImage 색상 초기화
+    // ================================================================================
+    VkImageSubresourceRange imageSubresourceRange{
+            .aspectMask = VK_IMAGE_ASPECT_COLOR_BIT,
+            .baseMipLevel = 0,
+            .levelCount = 1,
+            .baseArrayLayer = 0,
+            .layerCount = 1
+    };
+
+    vkCmdClearColorImage(mCommandBuffer,
+                         swapchainImage,
+                         VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
+                         &mClearColorValue,
+                         1,
+                         &imageSubresourceRange);
+
+    // ================================================================================
+    // 8. VkImageLayout 변환
+    // ================================================================================
+    VkImageMemoryBarrier imageMemoryBarrierForPresentSwapchainImage{
+            .sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER,
+            .srcAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT,
+            .dstAccessMask = 0,
+            .oldLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
+            .newLayout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR,
+            .srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
+            .dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
+            .image = swapchainImage,
+            .subresourceRange = {
+                    .aspectMask = VK_IMAGE_ASPECT_COLOR_BIT,
+                    .baseMipLevel = 0,
+                    .levelCount = 1,
+                    .baseArrayLayer = 0,
+                    .layerCount = 1
+            }
+    };
+
+    vkCmdPipelineBarrier(mCommandBuffer,
+                         VK_PIPELINE_STAGE_TRANSFER_BIT,
+                         VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT,
+                         0,
+                         0,
+                         nullptr,
+                         0,
+                         nullptr,
+                         1,
+                         &imageMemoryBarrierForPresentSwapchainImage);
+
+
+    // ================================================================================
+    // 9. VkCommandBuffer 기록 종료
+    // ================================================================================
+    VK_CHECK_ERROR(vkEndCommandBuffer(mCommandBuffer)); // mCommandBuffer는 Executable 상태가 된다.
+
+
+    // ================================================================================
+    // 10. VkCommandBuffer 제출
+    // ================================================================================
+    VkSubmitInfo submitInfo{
+            .sType = VK_STRUCTURE_TYPE_SUBMIT_INFO,
+            .commandBufferCount = 1,
+            .pCommandBuffers = &mCommandBuffer
+    };
+
+    // submitInfo 구조체를 넘김으로써 commandBuffer 정보를 queue에 제출
+    VK_CHECK_ERROR(vkQueueSubmit(mQueue, 1, &submitInfo, VK_NULL_HANDLE));
+    // commandBuffer를 vkQueueSubmit에 제출했지만 해당 Command buffer가 실행이 됐을지 안 됐을지 알 수 없다. CPU와 GPU는 따로따로 돌기 때문에 항상 실행이 됐다는 보장을 할 수 없다. 그래서 이를 보장하기 위해 vkQueueWaitIdle를 호출하여 이 queue에 제출한 Command buffer가 모두 다 실행되는 것을 보장한다.
+    VK_CHECK_ERROR(vkQueueWaitIdle(mQueue));
+
+
+    // ================================================================================
+    // 11. VkImage 화면에 출력
     // ================================================================================
     VkPresentInfoKHR presentInfo{
             .sType = VK_STRUCTURE_TYPE_PRESENT_INFO_KHR,
