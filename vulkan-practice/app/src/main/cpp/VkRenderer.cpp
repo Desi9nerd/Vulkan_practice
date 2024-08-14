@@ -395,9 +395,20 @@ VkRenderer::VkRenderer(ANativeWindow *window) {
     }; // 생성할 Fence의 정보를 해당 구조체에서 정의
 
     VK_CHECK_ERROR(vkCreateFence(mDevice, &fenceCreateInfo, nullptr, &mFence)); // mFence 생성. flag에 아무것도 넣어주지 않았기 때문에 생성된 Fence의 초기 상태는 Unsignal 상태다.
+
+
+    // ================================================================================
+    // 13. VkSemaphore 생성
+    // ================================================================================
+    VkSemaphoreCreateInfo semaphoreCreateInfo{
+            .sType = VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO,
+    };
+
+    VK_CHECK_ERROR(vkCreateSemaphore(mDevice, &semaphoreCreateInfo, nullptr, &mSemaphore));
 }
 
 VkRenderer::~VkRenderer() {
+    vkDestroySemaphore(mDevice, mSemaphore, nullptr);
     vkDestroyFence(mDevice, mFence, nullptr);
     vkFreeCommandBuffers(mDevice, mCommandPool, 1, &mCommandBuffer);
     vkDestroyCommandPool(mDevice, mCommandPool, nullptr);
@@ -547,7 +558,9 @@ void VkRenderer::render() {
     VkSubmitInfo submitInfo{
             .sType = VK_STRUCTURE_TYPE_SUBMIT_INFO,
             .commandBufferCount = 1,
-            .pCommandBuffers = &mCommandBuffer
+            .pCommandBuffers = &mCommandBuffer,
+            .signalSemaphoreCount = 1,
+            .pSignalSemaphores = &mSemaphore
     };
 
     // submitInfo 구조체를 넘김으로써 commandBuffer 정보를 queue에 제출
@@ -562,10 +575,11 @@ void VkRenderer::render() {
     VkPresentInfoKHR presentInfo{
             .sType = VK_STRUCTURE_TYPE_PRESENT_INFO_KHR,
             .swapchainCount = 1,
+            .pWaitSemaphores = &mSemaphore,
+            .swapchainCount = 1,
             .pSwapchains = &mSwapchain,
             .pImageIndices = &swapchainImageIndex
     };
 
     VK_CHECK_ERROR(vkQueuePresentKHR(mQueue, &presentInfo)); // 화면에 출력.
-    VK_CHECK_ERROR(vkQueueWaitIdle(mQueue));
 }
