@@ -298,8 +298,40 @@ VkRenderer::VkRenderer(ANativeWindow *window) {
                                            &swapchainImageCount,
                                            mSwapchainImages.data()));
 
+
+    mSwapchainImageViews.resize(swapchainImageCount); // ImageView를 Swapchain의 개수만큼 생성
+    for (auto i = 0; i != swapchainImageCount; ++i) {
+        // ================================================================================
+        // 6. VkImageView 생성
+        // ================================================================================
+        VkImageViewCreateInfo imageViewCreateInfo{ // 생성할 ImageView를 정의
+                .sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO,
+                .image = mSwapchainImages[i],
+                .viewType = VK_IMAGE_VIEW_TYPE_2D,
+                .format = surfaceFormats[surfaceFormatIndex].format, // Swapchain 이미지 포맷과 동일한 포맷으로 설정
+                .components = {
+                        .r = VK_COMPONENT_SWIZZLE_R,
+                        .g = VK_COMPONENT_SWIZZLE_G,
+                        .b = VK_COMPONENT_SWIZZLE_B,
+                        .a = VK_COMPONENT_SWIZZLE_A,
+                },
+                .subresourceRange = { // 모든 이미지에 대해서 이 이미지 뷰가 접근할 수 있도록 설정
+                        .aspectMask = VK_IMAGE_ASPECT_COLOR_BIT,
+                        .baseMipLevel = 0,
+                        .levelCount = 1,
+                        .baseArrayLayer = 0,
+                        .layerCount = 1
+                }
+        };
+
+        VK_CHECK_ERROR(vkCreateImageView(mDevice,
+                                         &imageViewCreateInfo,
+                                         nullptr,
+                                         &mSwapchainImageViews[i])); // mSwapchainImageViews[i] 생성
+    }
+
     // ================================================================================
-    // 6. VkCommandPool 생성
+    // 7. VkCommandPool 생성
     // ================================================================================
     VkCommandPoolCreateInfo commandPoolCreateInfo{
             .sType = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO,
@@ -311,7 +343,7 @@ VkRenderer::VkRenderer(ANativeWindow *window) {
     VK_CHECK_ERROR(vkCreateCommandPool(mDevice, &commandPoolCreateInfo, nullptr, &mCommandPool)); // mCommandPool 생성
 
     // ================================================================================
-    // 7. VkCommandBuffer 할당
+    // 8. VkCommandBuffer 할당
     // ================================================================================
     VkCommandBufferAllocateInfo commandBufferAllocateInfo{ // 할당하려는 command buffer 정의
             .sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO,
@@ -323,7 +355,7 @@ VkRenderer::VkRenderer(ANativeWindow *window) {
     VK_CHECK_ERROR(vkAllocateCommandBuffers(mDevice, &commandBufferAllocateInfo, &mCommandBuffer));
 
     // ================================================================================
-    // 8. VkCommandBuffer 기록 시작
+    // 9. VkCommandBuffer 기록 시작
     // ================================================================================
     VkCommandBufferBeginInfo commandBufferBeginInfo{
             .sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO,
@@ -335,7 +367,7 @@ VkRenderer::VkRenderer(ANativeWindow *window) {
 
     for (auto swapchainImage : mSwapchainImages) { // 스왑체인 이미지만큼 for문을 돈다.
         // ================================================================================
-        // 9. VkImageLayout 변환
+        // 10. VkImageLayout 변환
         // ================================================================================
         VkImageMemoryBarrier imageMemoryBarrierForPresentSwapchainImage{
                 .sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER,
@@ -368,12 +400,12 @@ VkRenderer::VkRenderer(ANativeWindow *window) {
     }
 
     // ================================================================================
-    // 10. VkCommandBuffer 기록 종료
+    // 11. VkCommandBuffer 기록 종료
     // ================================================================================
     VK_CHECK_ERROR(vkEndCommandBuffer(mCommandBuffer)); // mCommandBuffer는 Executable 상태가 된다.
 
     // ================================================================================
-    // 11. VkCommandBuffer 제출
+    // 12. VkCommandBuffer 제출
     // ================================================================================
     VkSubmitInfo submitInfo{
             .sType = VK_STRUCTURE_TYPE_SUBMIT_INFO,
@@ -388,7 +420,7 @@ VkRenderer::VkRenderer(ANativeWindow *window) {
 
 
     // ================================================================================
-    // 12. VkFence 생성
+    // 13. VkFence 생성
     // ================================================================================
     VkFenceCreateInfo fenceCreateInfo{
         .sType = VK_STRUCTURE_TYPE_FENCE_CREATE_INFO
@@ -398,7 +430,7 @@ VkRenderer::VkRenderer(ANativeWindow *window) {
 
 
     // ================================================================================
-    // 13. VkSemaphore 생성
+    // 14. VkSemaphore 생성
     // ================================================================================
     VkSemaphoreCreateInfo semaphoreCreateInfo{
             .sType = VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO,
@@ -408,6 +440,10 @@ VkRenderer::VkRenderer(ANativeWindow *window) {
 }
 
 VkRenderer::~VkRenderer() {
+    for (auto imageView : mSwapchainImageViews) {
+        vkDestroyImageView(mDevice, imageView, nullptr);
+    }
+    mSwapchainImageViews.clear();
     vkDestroySemaphore(mDevice, mSemaphore, nullptr);
     vkDestroyFence(mDevice, mFence, nullptr);
     vkFreeCommandBuffers(mDevice, mCommandPool, 1, &mCommandBuffer);
