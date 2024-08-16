@@ -437,9 +437,44 @@ VkRenderer::VkRenderer(ANativeWindow *window) {
     };
 
     VK_CHECK_ERROR(vkCreateSemaphore(mDevice, &semaphoreCreateInfo, nullptr, &mSemaphore));
+
+
+    // ================================================================================
+    // 15. VkRenderPass 생성
+    // ================================================================================
+    VkAttachmentDescription attachmentDescription{
+            .format = surfaceFormats[surfaceFormatIndex].format,
+            .samples = VK_SAMPLE_COUNT_1_BIT,
+            .loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR,
+            .storeOp = VK_ATTACHMENT_STORE_OP_STORE,
+            .initialLayout = VK_IMAGE_LAYOUT_UNDEFINED,
+            .finalLayout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR
+    };
+
+    VkAttachmentReference attachmentReference{
+            .attachment = 0,
+            .layout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL
+    };
+
+    VkSubpassDescription subpassDescription{
+            .pipelineBindPoint = VK_PIPELINE_BIND_POINT_GRAPHICS,
+            .colorAttachmentCount = 1,
+            .pColorAttachments = &attachmentReference
+    };
+
+    VkRenderPassCreateInfo renderPassCreateInfo{
+            .sType = VK_STRUCTURE_TYPE_RENDER_PASS_CREATE_INFO,
+            .attachmentCount = 1,
+            .pAttachments = &attachmentDescription,
+            .subpassCount = 1,
+            .pSubpasses = &subpassDescription
+    };
+
+    VK_CHECK_ERROR(vkCreateRenderPass(mDevice, &renderPassCreateInfo, nullptr, &mRenderPass)); // mRenderPass 생성.
 }
 
 VkRenderer::~VkRenderer() {
+    vkDestroyRenderPass(mDevice, mRenderPass, nullptr);
     for (auto imageView : mSwapchainImageViews) {
         vkDestroyImageView(mDevice, imageView, nullptr);
     }
@@ -610,7 +645,7 @@ void VkRenderer::render() {
     // ================================================================================
     VkPresentInfoKHR presentInfo{
             .sType = VK_STRUCTURE_TYPE_PRESENT_INFO_KHR,
-            .swapchainCount = 1,
+            .waitSemaphoreCount = 1,
             .pWaitSemaphores = &mSemaphore,
             .swapchainCount = 1,
             .pSwapchains = &mSwapchain,
@@ -618,4 +653,5 @@ void VkRenderer::render() {
     };
 
     VK_CHECK_ERROR(vkQueuePresentKHR(mQueue, &presentInfo)); // 화면에 출력.
+    VK_CHECK_ERROR(vkQueueWaitIdle(mQueue));
 }
