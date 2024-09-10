@@ -356,7 +356,7 @@ VkRenderer::VkRenderer(ANativeWindow *window) {
 
 
     // ================================================================================
-    // 13. VkFence 생성
+    // 9. VkFence 생성
     // ================================================================================
     VkFenceCreateInfo fenceCreateInfo{
         .sType = VK_STRUCTURE_TYPE_FENCE_CREATE_INFO
@@ -366,7 +366,7 @@ VkRenderer::VkRenderer(ANativeWindow *window) {
 
 
     // ================================================================================
-    // 14. VkSemaphore 생성
+    // 10. VkSemaphore 생성
     // ================================================================================
     VkSemaphoreCreateInfo semaphoreCreateInfo{
             .sType = VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO,
@@ -376,7 +376,7 @@ VkRenderer::VkRenderer(ANativeWindow *window) {
 
 
     // ================================================================================
-    // 15. VkRenderPass 생성
+    // 11. VkRenderPass 생성
     // ================================================================================
     VkAttachmentDescription attachmentDescription{
             .format = surfaceFormats[surfaceFormatIndex].format,
@@ -411,7 +411,7 @@ VkRenderer::VkRenderer(ANativeWindow *window) {
     mFramebuffers.resize(swapchainImageCount);
     for (auto i = 0; i != swapchainImageCount; ++i) {
         // ================================================================================
-        // 16. VkFramebuffer 생성
+        // 12. VkFramebuffer 생성
         // ================================================================================
         VkFramebufferCreateInfo framebufferCreateInfo{
                 .sType = VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO,
@@ -423,7 +423,7 @@ VkRenderer::VkRenderer(ANativeWindow *window) {
                 .layers = 1
         };
 
-        VK_CHECK_ERROR(vkCreateFramebuffer(mDevice, &framebufferCreateInfo, nullptr, &mFramebuffers[i]));// mRenderPass 생성
+        VK_CHECK_ERROR(vkCreateFramebuffer(mDevice, &framebufferCreateInfo, nullptr, &mFramebuffers[i]));// mFramebuffers[i] 생성
     }
 }
 
@@ -488,7 +488,7 @@ void VkRenderer::render() {
 
 
     // ================================================================================
-    // . VkRenderPass 시작
+    // 5. VkRenderPass 시작
     // ================================================================================
     VkRenderPassBeginInfo renderPassBeginInfo{
             .sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO,
@@ -504,26 +504,24 @@ void VkRenderer::render() {
     vkCmdBeginRenderPass(mCommandBuffer, &renderPassBeginInfo, VK_SUBPASS_CONTENTS_INLINE);
 
     // ================================================================================
-    // . VkRenderPass 종료
+    // 6. VkRenderPass 종료
     // ================================================================================
     vkCmdEndRenderPass(mCommandBuffer);
 
     // ================================================================================
-    // . Clear 색상 갱신
+    // 7. Clear 색상 갱신
     // ================================================================================
     for (auto i = 0; i != 4; ++i) {
         mClearValue.color.float32[i] = fmodf(mClearValue.color.float32[i] + 0.01, 1.0);
     }
 
-
     // ================================================================================
-    // 9. VkCommandBuffer 기록 종료
+    // 8. VkCommandBuffer 기록 종료
     // ================================================================================
     VK_CHECK_ERROR(vkEndCommandBuffer(mCommandBuffer)); // mCommandBuffer는 Executable 상태가 된다.
 
-
     // ================================================================================
-    // 10. VkCommandBuffer 제출
+    // 9. VkCommandBuffer 제출
     // ================================================================================
     VkSubmitInfo submitInfo{
             .sType = VK_STRUCTURE_TYPE_SUBMIT_INFO,
@@ -538,9 +536,8 @@ void VkRenderer::render() {
     // commandBuffer를 vkQueueSubmit에 제출했지만 해당 Command buffer가 실행이 됐을지 안 됐을지 알 수 없다. CPU와 GPU는 따로따로 돌기 때문에 항상 실행이 됐다는 보장을 할 수 없다. 그래서 이를 보장하기 위해 vkQueueWaitIdle를 호출하여 이 queue에 제출한 Command buffer가 모두 다 실행되는 것을 보장한다.
     VK_CHECK_ERROR(vkQueueWaitIdle(mQueue));
 
-
     // ================================================================================
-    // 11. VkImage 화면에 출력
+    // 10. VkImage 화면에 출력
     // ================================================================================
     VkPresentInfoKHR presentInfo{
             .sType = VK_STRUCTURE_TYPE_PRESENT_INFO_KHR,
