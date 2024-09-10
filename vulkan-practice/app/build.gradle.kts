@@ -54,6 +54,8 @@ dependencies {
     implementation("androidx.appcompat:appcompat:1.6.1")
     implementation("com.google.android.material:material:1.11.0")
     implementation("androidx.games:games-activity:1.2.2")
+    implementation("androidx.test.ext:junit-gtest:1.0.0-alpha02")
+    implementation("com.android.ndk.thirdparty:googletest:1.11.0-beta-1")
     testImplementation("junit:junit:4.13.2")
     androidTestImplementation("androidx.test.ext:junit:1.1.5")
     androidTestImplementation("androidx.test.espresso:espresso-core:3.5.1")
