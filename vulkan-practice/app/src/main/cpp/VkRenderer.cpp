@@ -471,9 +471,31 @@ VkRenderer::VkRenderer(ANativeWindow *window) {
     };
 
     VK_CHECK_ERROR(vkCreateRenderPass(mDevice, &renderPassCreateInfo, nullptr, &mRenderPass)); // mRenderPass 생성.
+
+    mFramebuffers.resize(swapchainImageCount);
+    for (auto i = 0; i != swapchainImageCount; ++i) {
+        // ================================================================================
+        // 16. VkFramebuffer 생성
+        // ================================================================================
+        VkFramebufferCreateInfo framebufferCreateInfo{
+                .sType = VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO,
+                .renderPass = mRenderPass,
+                .attachmentCount = 1,
+                .pAttachments = &mSwapchainImageViews[i], // ImageView
+                .width = mSwapchainImageExtent.width,
+                .height = mSwapchainImageExtent.height,
+                .layers = 1
+        };
+
+        VK_CHECK_ERROR(vkCreateFramebuffer(mDevice, &framebufferCreateInfo, nullptr, &mFramebuffers[i]));// mRenderPass 생성
+    }
 }
 
 VkRenderer::~VkRenderer() {
+    for (auto framebuffer : mFramebuffers) {
+        vkDestroyFramebuffer(mDevice, framebuffer, nullptr);
+    }
+    mFramebuffers.clear();
     vkDestroyRenderPass(mDevice, mRenderPass, nullptr);
     for (auto imageView : mSwapchainImageViews) {
         vkDestroyImageView(mDevice, imageView, nullptr);
