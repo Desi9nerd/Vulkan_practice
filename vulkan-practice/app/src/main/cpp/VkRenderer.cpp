@@ -31,6 +31,28 @@
 
 using namespace std;
 
+struct Vector3 {
+    union {
+        float x;
+        float r;
+    };
+
+    union {
+        float y;
+        float g;
+    };
+
+    union {
+        float z;
+        float b;
+    };
+};
+
+struct Vertex {
+    Vector3 position;
+    Vector3 color;
+};
+
 VkRenderer::VkRenderer(ANativeWindow *window) {
     // ================================================================================
     // 1. VkInstance 생성
@@ -597,9 +619,37 @@ VkRenderer::VkRenderer(ANativeWindow *window) {
                                              nullptr,
                                              &mPipeline));
 
+    // ================================================================================
+    // 17. Vertex VkBuffer 생성
+    // ================================================================================
+    constexpr array<Vertex, 3> vertices{
+            Vertex{
+                    .position{0.0, -0.5, 0.0},
+                    .color{1.0, 0.0, 0.0}
+            },
+            Vertex{
+                    .position{0.5, 0.5, 0.0},
+                    .color{0.0, 1.0, 0.0}
+            },
+            Vertex{
+                    .position{-0.5, 0.5, 0.0},
+                    .color{0.0, 0.0, 1.0}
+            },
+    };
+    constexpr VkDeviceSize verticesSize{vertices.size() * sizeof(Vertex)};
+
+    VkBufferCreateInfo bufferCreateInfo{
+            .sType =VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO,
+            .size = verticesSize,
+            .usage = VK_BUFFER_USAGE_VERTEX_BUFFER_BIT
+    };
+
+    VK_CHECK_ERROR(vkCreateBuffer(mDevice, &bufferCreateInfo, nullptr, &mVertexBuffer));
+
 }
 
 VkRenderer::~VkRenderer() {
+    vkDestroyBuffer(mDevice, mVertexBuffer, nullptr);
     vkDestroyPipelineLayout(mDevice, mPipelineLayout, nullptr);
     vkDestroyPipeline(mDevice, mPipeline, nullptr);
     vkDestroyShaderModule(mDevice, mVertexShaderModule, nullptr);
