@@ -144,9 +144,13 @@ VkRenderer::VkRenderer(ANativeWindow *window) {
          << VK_API_VERSION_MAJOR(physicalDeviceProperties.driverVersion) << "."
          << VK_API_VERSION_MINOR(physicalDeviceProperties.driverVersion);
 
+    // ================================================================================
+    // 3. VkPhysicalDeviceMemoryProperties 얻기
+    // ================================================================================
+    vkGetPhysicalDeviceMemoryProperties(mPhysicalDevice, &mPhysicalDeviceMemoryProperties);
 
     // ================================================================================
-    // 3. VkDevice 생성
+    // 4. VkDevice 생성
     // ================================================================================
     uint32_t queueFamilyPropertiesCount;
 
@@ -214,7 +218,7 @@ VkRenderer::VkRenderer(ANativeWindow *window) {
 
 
     // ================================================================================
-    // 4. VkSurface 생성
+    // 5. VkSurface 생성
     // ================================================================================
     VkAndroidSurfaceCreateInfoKHR surfaceCreateInfo{
             .sType = VK_STRUCTURE_TYPE_ANDROID_SURFACE_CREATE_INFO_KHR,
@@ -233,7 +237,7 @@ VkRenderer::VkRenderer(ANativeWindow *window) {
 
 
     // ================================================================================
-    // 5. VkSwapchain 생성
+    // 6. VkSwapchain 생성
     // ================================================================================
     VkSurfaceCapabilitiesKHR surfaceCapabilities;
     VK_CHECK_ERROR(vkGetPhysicalDeviceSurfaceCapabilitiesKHR(mPhysicalDevice,
@@ -324,7 +328,7 @@ VkRenderer::VkRenderer(ANativeWindow *window) {
     mSwapchainImageViews.resize(swapchainImageCount); // ImageView를 Swapchain의 개수만큼 생성
     for (auto i = 0; i != swapchainImageCount; ++i) {
         // ================================================================================
-        // 6. VkImageView 생성
+        // 7. VkImageView 생성
         // ================================================================================
         VkImageViewCreateInfo imageViewCreateInfo{ // 생성할 ImageView를 정의
                 .sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO,
@@ -353,7 +357,7 @@ VkRenderer::VkRenderer(ANativeWindow *window) {
     }
 
     // ================================================================================
-    // 7. VkCommandPool 생성
+    // 8. VkCommandPool 생성
     // ================================================================================
     VkCommandPoolCreateInfo commandPoolCreateInfo{
             .sType = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO,
@@ -365,7 +369,7 @@ VkRenderer::VkRenderer(ANativeWindow *window) {
     VK_CHECK_ERROR(vkCreateCommandPool(mDevice, &commandPoolCreateInfo, nullptr, &mCommandPool)); // mCommandPool 생성
 
     // ================================================================================
-    // 8. VkCommandBuffer 할당
+    // 9. VkCommandBuffer 할당
     // ================================================================================
     VkCommandBufferAllocateInfo commandBufferAllocateInfo{ // 할당하려는 command buffer 정의
             .sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO,
@@ -378,7 +382,7 @@ VkRenderer::VkRenderer(ANativeWindow *window) {
 
 
     // ================================================================================
-    // 9. VkFence 생성
+    // 10. VkFence 생성
     // ================================================================================
     VkFenceCreateInfo fenceCreateInfo{
         .sType = VK_STRUCTURE_TYPE_FENCE_CREATE_INFO
@@ -388,7 +392,7 @@ VkRenderer::VkRenderer(ANativeWindow *window) {
 
 
     // ================================================================================
-    // 10. VkSemaphore 생성
+    // 11. VkSemaphore 생성
     // ================================================================================
     VkSemaphoreCreateInfo semaphoreCreateInfo{
             .sType = VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO,
@@ -398,7 +402,7 @@ VkRenderer::VkRenderer(ANativeWindow *window) {
 
 
     // ================================================================================
-    // 11. VkRenderPass 생성
+    // 12. VkRenderPass 생성
     // ================================================================================
     VkAttachmentDescription attachmentDescription{
             .format = surfaceFormats[surfaceFormatIndex].format,
@@ -433,7 +437,7 @@ VkRenderer::VkRenderer(ANativeWindow *window) {
     mFramebuffers.resize(swapchainImageCount);
     for (auto i = 0; i != swapchainImageCount; ++i) {
         // ================================================================================
-        // 12. VkFramebuffer 생성
+        // 13. VkFramebuffer 생성
         // ================================================================================
         VkFramebufferCreateInfo framebufferCreateInfo{
                 .sType = VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO,
@@ -450,7 +454,7 @@ VkRenderer::VkRenderer(ANativeWindow *window) {
 
 
     // ================================================================================
-    // 13. Vertex VkShaderModule 생성
+    // 14. Vertex VkShaderModule 생성
     // ================================================================================
     string_view vertexShaderCode = {
             "#version 310 es                                        \n"
@@ -482,7 +486,7 @@ VkRenderer::VkRenderer(ANativeWindow *window) {
                                         &mVertexShaderModule)); // mVertexShaderModule 생성.
 
     // ================================================================================
-    // 14. Fragment VkShaderModule 생성
+    // 15. Fragment VkShaderModule 생성
     // ================================================================================
     string_view fragmentShaderCode = {
             "#version 310 es                                        \n"
@@ -512,7 +516,7 @@ VkRenderer::VkRenderer(ANativeWindow *window) {
                                         &mFragmentShaderModule));
 
     // ================================================================================
-    // 15. VkPipelineLayout 생성
+    // 16. VkPipelineLayout 생성
     // ================================================================================
     VkPipelineLayoutCreateInfo pipelineLayoutCreateInfo{
             .sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO
@@ -524,7 +528,7 @@ VkRenderer::VkRenderer(ANativeWindow *window) {
                                           &mPipelineLayout));
 
     // ================================================================================
-    // 16. Graphics VkPipeline 생성
+    // 17. Graphics VkPipeline 생성
     // ================================================================================
     array<VkPipelineShaderStageCreateInfo, 2> pipelineShaderStageCreateInfos{
             VkPipelineShaderStageCreateInfo{
@@ -620,7 +624,7 @@ VkRenderer::VkRenderer(ANativeWindow *window) {
                                              &mPipeline));
 
     // ================================================================================
-    // 17. Vertex VkBuffer 생성
+    // 18. Vertex VkBuffer 생성
     // ================================================================================
     constexpr array<Vertex, 3> vertices{
             Vertex{
@@ -646,9 +650,36 @@ VkRenderer::VkRenderer(ANativeWindow *window) {
 
     VK_CHECK_ERROR(vkCreateBuffer(mDevice, &bufferCreateInfo, nullptr, &mVertexBuffer));
 
+    // ================================================================================
+    // 19. Vertex VkBuffer의 VkMemoryRequirements 얻기
+    // ================================================================================
+    VkMemoryRequirements vertexMemoryRequirements;
+    vkGetBufferMemoryRequirements(mDevice, mVertexBuffer, &vertexMemoryRequirements);
+
+    // ================================================================================
+    // 20. Vertex VkDeviceMemory를 할당 할 수 있는 메모리 타입 인덱스 얻기
+    // ================================================================================
+    uint32_t vertexMemoryTypeIndex;
+    VK_CHECK_ERROR(vkGetMemoryTypeIndex(mPhysicalDeviceMemoryProperties,
+                                        vertexMemoryRequirements,
+                                        VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT |
+                                        VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
+                                        &vertexMemoryTypeIndex));
+
+    // ================================================================================
+    // 21. Vertex VkDeviceMemory 할당
+    // ================================================================================
+    VkMemoryAllocateInfo vertexMemoryAllocateInfo{
+            .sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO,
+            .allocationSize = vertexMemoryRequirements.size,
+            .memoryTypeIndex = vertexMemoryTypeIndex
+    };
+
+    VK_CHECK_ERROR(vkAllocateMemory(mDevice, &vertexMemoryAllocateInfo, nullptr, &mVertexMemory));
 }
 
 VkRenderer::~VkRenderer() {
+    vkFreeMemory(mDevice, mVertexMemory, nullptr);
     vkDestroyBuffer(mDevice, mVertexBuffer, nullptr);
     vkDestroyPipelineLayout(mDevice, mPipelineLayout, nullptr);
     vkDestroyPipeline(mDevice, mPipeline, nullptr);

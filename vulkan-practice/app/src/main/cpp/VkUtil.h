@@ -23,10 +23,17 @@
 #ifndef PRACTICE_VULKAN_VKUTIL_H
 #define PRACTICE_VULKAN_VKUTIL_H
 
+#include <string_view>
 #include <string>
+#include <vector>
+#include <random>
 #include <vulkan/vulkan.h>
+#include <shaderc/shaderc.hpp>
+
+#include "AndroidOut.h"
 
 #ifndef NDEBUG
+
 inline std::string vkToString(VkResult vkResult) {
     switch (vkResult) {
         case VK_SUCCESS:
@@ -123,5 +130,73 @@ inline std::string vkToString(VkResult vkResult) {
         vkFunction                                                                     \
     } while (0)
 #endif
+
+inline std::string_view vkToString(VkPhysicalDeviceType physicalDeviceType) {
+    switch (physicalDeviceType) {
+        case VK_PHYSICAL_DEVICE_TYPE_OTHER:
+            return "Other";
+        case VK_PHYSICAL_DEVICE_TYPE_INTEGRATED_GPU:
+            return "Integrated GPU";
+        case VK_PHYSICAL_DEVICE_TYPE_DISCRETE_GPU:
+            return "Discrete GPU";
+        case VK_PHYSICAL_DEVICE_TYPE_VIRTUAL_GPU:
+            return "Virtual GPU";
+        case VK_PHYSICAL_DEVICE_TYPE_CPU:
+            return "CPU";
+        default:
+            return "Unknown";
+    }
+}
+
+typedef enum VkShaderType {
+    VK_SHADER_TYPE_VERTEX = shaderc_vertex_shader,
+    VK_SHADER_TYPE_FRAGMENT = shaderc_fragment_shader
+} VkShaderType;
+
+inline VkResult
+vkCompileShader(std::string_view shaderCode, VkShaderType shaderType,
+                std::vector<uint32_t> *shaderBinary) {
+    std::random_device device;
+    std::mt19937 generator(device());
+    std::uniform_int_distribution distribution('a', 'z');
+    std::string tag('a', 4);
+
+    for (auto i = 0; i < 16; ++i) {
+        tag[i] = static_cast<char>(distribution(generator));
+    }
+
+    shaderc::Compiler compiler;
+    auto result = compiler.CompileGlslToSpv(shaderCode.data(),
+                                            shaderCode.size(),
+                                            static_cast<shaderc_shader_kind>(shaderType),
+                                            tag.c_str());
+
+    if (result.GetCompilationStatus() != shaderc_compilation_status_success) {
+        aout << result.GetErrorMessage() << std::endl;
+        return VK_ERROR_UNKNOWN;
+    }
+
+    *shaderBinary = std::vector(result.cbegin(), result.cend());
+    return VK_SUCCESS;
+}
+
+inline VkResult
+vkGetMemoryTypeIndex(const VkPhysicalDeviceMemoryProperties &physicalDeviceMemoryProperties,
+                     const VkMemoryRequirements &memoryRequirements,
+                     VkMemoryPropertyFlags memoryPropertyFlags,
+                     uint32_t *memoryTypeIndex) {
+    for (auto i = 0; i != physicalDeviceMemoryProperties.memoryTypeCount; ++i) {
+        if (memoryRequirements.memoryTypeBits & (1 << i)) {
+            if ((physicalDeviceMemoryProperties.memoryTypes[i].propertyFlags &
+                 memoryPropertyFlags) == memoryPropertyFlags) {
+                *memoryTypeIndex = i;
+                return VK_SUCCESS;
+            }
+        }
+    }
+
+    *memoryTypeIndex = UINT32_MAX;
+    return VK_ERROR_UNKNOWN;
+}
 
 #endif //PRACTICE_VULKAN_VKUTIL_H
