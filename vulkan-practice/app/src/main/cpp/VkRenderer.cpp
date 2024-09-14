@@ -670,15 +670,15 @@ VkRenderer::VkRenderer(ANativeWindow *window) {
                     .color{0.0, 0.0, 1.0}
             },
     };
-    constexpr VkDeviceSize verticesSize{vertices.size() * sizeof(Vertex)};
+    constexpr VkDeviceSize vertexDataSize{vertices.size() * sizeof(Vertex)};
 
-    VkBufferCreateInfo bufferCreateInfo{
+    VkBufferCreateInfo vertexBufferCreateInfo{
             .sType =VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO,
-            .size = verticesSize,
+            .size = vertexDataSize,
             .usage = VK_BUFFER_USAGE_VERTEX_BUFFER_BIT
     };
 
-    VK_CHECK_ERROR(vkCreateBuffer(mDevice, &bufferCreateInfo, nullptr, &mVertexBuffer));
+    VK_CHECK_ERROR(vkCreateBuffer(mDevice, &vertexBufferCreateInfo, nullptr, &mVertexBuffer));
 
     // ================================================================================
     // 19. Vertex VkBuffer의 VkMemoryRequirements 얻기
