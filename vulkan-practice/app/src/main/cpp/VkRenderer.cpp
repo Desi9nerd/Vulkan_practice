@@ -21,6 +21,7 @@
 // SOFTWARE.
 
 #include <cassert>
+#include <cstddef>
 #include <array>
 #include <vector>
 #include <iomanip>
@@ -304,7 +305,7 @@ VkRenderer::VkRenderer(ANativeWindow *window) {
             .minImageCount = surfaceCapabilities.minImageCount,
             .imageFormat = surfaceFormats[surfaceFormatIndex].format,
             .imageColorSpace = surfaceFormats[surfaceFormatIndex].colorSpace,
-            .imageExtent = surfaceCapabilities.currentExtent,
+            .imageExtent = mSwapchainImageExtent,
             .imageArrayLayers = 1,
             .imageUsage = swapchainImageUsage,
             .imageSharingMode = VK_SHARING_MODE_EXCLUSIVE,
@@ -459,12 +460,14 @@ VkRenderer::VkRenderer(ANativeWindow *window) {
     string_view vertexShaderCode = {
             "#version 310 es                                        \n"
             "                                                       \n"
-            "void main() {                                          \n"
-            "    vec2 pos[3] = vec2[3](vec2(-0.5,  0.5),            \n"
-            "                          vec2( 0.5,  0.5),            \n"
-            "                          vec2( 0.0, -0.5));           \n"
+            "layout(location = 0) in vec3 inPosition;               \n"
+            "layout(location = 1) in vec3 inColor;                  \n"
             "                                                       \n"
-            "    gl_Position = vec4(pos[gl_VertexIndex], 0.0, 1.0); \n"
+            "layout(location = 0) out vec3 outColor;                \n"
+            "                                                       \n"
+            "void main() {                                          \n"
+            "    gl_Position = vec4(inPosition, 1.0);               \n"
+            "    outColor = inColor;                                \n"
             "}                                                      \n"
     };
 
@@ -492,10 +495,12 @@ VkRenderer::VkRenderer(ANativeWindow *window) {
             "#version 310 es                                        \n"
             "precision mediump float;                               \n"
             "                                                       \n"
-            "layout(location = 0) out vec4 fragmentColor;           \n"
+            "layout(location = 0) in vec3 inColor;                  \n"
+            "                                                       \n"
+            "layout(location = 0) out vec4 outColor;                \n"
             "                                                       \n"
             "void main() {                                          \n"
-            "    fragmentColor = vec4(1.0, 0.0, 0.0, 1.0);          \n"
+            "    outColor = vec4(inColor, 1.0);                     \n"
             "}                                                      \n"
     };
 
@@ -545,8 +550,33 @@ VkRenderer::VkRenderer(ANativeWindow *window) {
             }
     };
 
+    VkVertexInputBindingDescription vertexInputBindingDescription{
+            .binding = 0,
+            .stride = sizeof(Vertex),
+            .inputRate = VK_VERTEX_INPUT_RATE_VERTEX
+    };
+
+    array<VkVertexInputAttributeDescription, 2> vertexInputAttributeDescriptions{
+            VkVertexInputAttributeDescription{
+                    .location = 0,
+                    .binding = 0,
+                    .format = VK_FORMAT_R32G32B32_SFLOAT,
+                    .offset = offsetof(Vertex, position)
+            },
+            VkVertexInputAttributeDescription{
+                    .location = 1,
+                    .binding = 0,
+                    .format = VK_FORMAT_R32G32B32_SFLOAT,
+                    .offset = offsetof(Vertex, color)
+            }
+    };
+
     VkPipelineVertexInputStateCreateInfo pipelineVertexInputStateCreateInfo{
-            .sType = VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO
+            .sType = VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO,
+            .vertexBindingDescriptionCount = 1,
+            .pVertexBindingDescriptions = &vertexInputBindingDescription,
+            .vertexAttributeDescriptionCount = static_cast<uint32_t>(vertexInputAttributeDescriptions.size()),
+            .pVertexAttributeDescriptions = vertexInputAttributeDescriptions.data()
     };
 
     VkPipelineInputAssemblyStateCreateInfo pipelineInputAssemblyStateCreateInfo{
@@ -676,6 +706,19 @@ VkRenderer::VkRenderer(ANativeWindow *window) {
     };
 
     VK_CHECK_ERROR(vkAllocateMemory(mDevice, &vertexMemoryAllocateInfo, nullptr, &mVertexMemory));
+
+    // ================================================================================
+    // 22. Vertex VkBuffer와 Vertex VkDeviceMemory 바인드
+    // ================================================================================
+    VK_CHECK_ERROR(vkBindBufferMemory(mDevice, mVertexBuffer, mVertexMemory, 0));
+
+    // ================================================================================
+    // 23. Vertex 데이터 복사
+    // ================================================================================
+    void* vertexData;
+    VK_CHECK_ERROR(vkMapMemory(mDevice, mVertexMemory, 0, vertexDataSize, 0, &vertexData));
+    memcpy(vertexData, vertices.data(), vertexDataSize);
+    vkUnmapMemory(mDevice, mVertexMemory);
 }
 
 VkRenderer::~VkRenderer() {
@@ -766,21 +809,20 @@ void VkRenderer::render() {
     vkCmdBindPipeline(mCommandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, mPipeline);
 
     // ================================================================================
-    // 7. 삼각형 그리기
+    // 7. Vertex VkBuffer 바인드
+    // ================================================================================
+    VkDeviceSize vertexBufferOffset{0};
+    vkCmdBindVertexBuffers(mCommandBuffer, 0, 1, &mVertexBuffer, &vertexBufferOffset);
+
+    // ================================================================================
+    // 8. 삼각형 그리기
     // ================================================================================
     vkCmdDraw(mCommandBuffer, 3, 1, 0, 0);
 
     // ================================================================================
-    // 8. VkRenderPass 종료
+    // 9. VkRenderPass 종료
     // ================================================================================
     vkCmdEndRenderPass(mCommandBuffer);
-
-    // ================================================================================
-    // 9. Clear 색상 갱신
-    // ================================================================================
-    for (auto i = 0; i != 4; ++i) {
-        mClearValue.color.float32[i] = fmodf(mClearValue.color.float32[i] + 0.01, 1.0);
-    }
 
     // ================================================================================
     // 10. VkCommandBuffer 기록 종료
