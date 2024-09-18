@@ -761,9 +761,22 @@ VkRenderer::VkRenderer(ANativeWindow *window) {
                                           &descriptorPoolCreateInfo,
                                           nullptr,
                                           &mDescriptorPool));
+
+    // ================================================================================
+    // 25. VkDescriptorSet 할당
+    // ================================================================================
+    VkDescriptorSetAllocateInfo descriptorSetAllocateInfo{
+            .sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO,
+            .descriptorPool = mDescriptorPool,
+            .descriptorSetCount = 1,
+            .pSetLayouts = &mDescriptorSetLayout
+    };
+
+    VK_CHECK_ERROR(vkAllocateDescriptorSets(mDevice, &descriptorSetAllocateInfo, &mDescriptorSet));
 }
 
 VkRenderer::~VkRenderer() {
+    vkFreeDescriptorSets(mDevice, mDescriptorPool, 1, &mDescriptorSet);
     vkDestroyDescriptorPool(mDevice, mDescriptorPool, nullptr);
     vkFreeMemory(mDevice, mVertexMemory, nullptr);
     vkDestroyBuffer(mDevice, mVertexBuffer, nullptr);
